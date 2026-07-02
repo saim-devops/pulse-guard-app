@@ -29,7 +29,7 @@ resource "aws_db_instance" "postgres" {
   identifier = "${var.project_name}-${var.environment}-postgres"
 
   engine         = "postgres"
-  engine_version = "16.4" # pinned — "16" alone causes AWS to resolve it differently over time, which shows as a perpetual plan diff
+  engine_version = "16.13" # pinned — "16" alone causes AWS to resolve it differently over time, which shows as a perpetual plan diff
 
   instance_class = var.db_instance_class
 
