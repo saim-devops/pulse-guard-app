@@ -25,9 +25,15 @@ data "aws_ami" "ubuntu" {
 resource "aws_instance" "master" {
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = var.instance_type
-  subnet_id              = aws_subnet.private[0].id
+  subnet_id              = aws_subnet.public[0].id
+  key_name               = var.ssh-key
   vpc_security_group_ids = [aws_security_group.nodes.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
+
+  root_block_device {
+    volume_size = 20
+    volume_type = "gp3"
+  }
 
   tags = {
     Name = "${var.project_name}-${var.environment}-master"
@@ -44,9 +50,15 @@ resource "aws_instance" "worker" {
 
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = var.instance_type
-  subnet_id              = aws_subnet.private[1].id
+  subnet_id              = aws_subnet.public[each.value.subnet_index].id
+  key_name               = var.ssh-key
   vpc_security_group_ids = [aws_security_group.nodes.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
+
+  root_block_device {
+    volume_size = 20
+    volume_type = "gp3"
+  }
 
   tags = {
     Name = each.key

@@ -17,7 +17,7 @@ resource "aws_internet_gateway" "igw" {
   }
 }
 
-# Public Subnets (one per AZ)
+# Public Subnets (one per AZ) — master + worker nodes live here
 resource "aws_subnet" "public" {
   count = length(data.aws_availability_zones.available.names)
 
@@ -32,7 +32,7 @@ resource "aws_subnet" "public" {
   }
 }
 
-# Private Subnets (one per AZ)
+# Private Subnets (one per AZ) — RDS only, no internet route needed at all
 resource "aws_subnet" "private" {
   count = length(data.aws_availability_zones.available.names)
 
@@ -43,29 +43,6 @@ resource "aws_subnet" "private" {
   tags = {
     Name = "${var.project_name}-${var.environment}-private-${count.index + 1}"
     Type = "Private"
-  }
-}
-
-# Elastic IP for NAT Gateway
-resource "aws_eip" "nat" {
-  domain = "vpc"
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-nat-eip"
-  }
-}
-
-# NAT Gateway (placed in first public subnet)
-resource "aws_nat_gateway" "nat" {
-  allocation_id = aws_eip.nat.id
-  subnet_id     = aws_subnet.public[0].id
-
-  depends_on = [
-    aws_internet_gateway.igw
-  ]
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-nat"
   }
 }
 
@@ -83,14 +60,11 @@ resource "aws_route_table" "public" {
   }
 }
 
-# Private Route Table
+# Private Route Table — intentionally has no 0.0.0.0/0 route.
+# RDS is the only occupant of the private subnets and never dials out;
+# a NAT Gateway here would just be ~$32/mo for a route nothing uses.
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
-
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.nat.id
-  }
 
   tags = {
     Name = "${var.project_name}-${var.environment}-private-rt"
