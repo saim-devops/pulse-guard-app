@@ -33,3 +33,7 @@ output "ecr_checker_repo" {
 output "ssm_prefix" {
   value = local.ssm_prefix
 }
+
+output "route53_name_servers" {
+  value = aws_route53_zone.root.name_servers
+}

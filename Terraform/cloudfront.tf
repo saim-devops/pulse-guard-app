@@ -70,7 +70,7 @@ resource "aws_cloudfront_distribution" "main" {
 }
 
 resource "aws_route53_record" "subdomain" {
-  zone_id = data.aws_route53_zone.root.zone_id
+  zone_id = aws_route53_zone.root.zone_id
   name    = "${var.subdomain}.${var.domain_name}"
   type    = "A"
 

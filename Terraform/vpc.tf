@@ -34,7 +34,7 @@ resource "aws_subnet" "public" {
 
 # Private Subnets (one per AZ) — RDS only, no internet route needed at all
 resource "aws_subnet" "private" {
-  count = length(data.aws_availability_zones.available.names)
+  count = length(var.public_subnet_cidrs)
 
   vpc_id            = aws_vpc.main.id
   cidr_block        = var.private_subnet_cidrs[count.index]

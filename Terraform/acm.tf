@@ -2,9 +2,8 @@
 # Existing hosted zone for saimm.online
 #############################################
 
-data "aws_route53_zone" "root" {
-  name         = "${var.domain_name}."
-  private_zone = false
+resource "aws_route53_zone" "root" {
+  name = var.domain_name
 }
 
 #############################################
@@ -34,7 +33,7 @@ resource "aws_route53_record" "cdn_validation" {
     }
   }
 
-  zone_id = data.aws_route53_zone.root.zone_id
+  zone_id = aws_route53_zone.root.zone_id
   name    = each.value.name
   type    = each.value.type
   records = [each.value.record]
