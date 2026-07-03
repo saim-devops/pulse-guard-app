@@ -14,7 +14,7 @@ provider "aws" {
 # Required for CloudFront ACM certificates
 provider "aws" {
   alias  = "use1"
-  region = "us-east-1"
+  region = "us-east-1"    #fixed_can't change
 
   default_tags {
     tags = {
