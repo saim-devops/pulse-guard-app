@@ -41,7 +41,7 @@ resource "aws_subnet" "private" {
   availability_zone = data.aws_availability_zones.available.names[count.index]
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-private-${count.index + 1}"
+    Name = "${var.project_name}-${var.environment}-private-_${count.index + 1}"
     Type = "Private"
   }
 }

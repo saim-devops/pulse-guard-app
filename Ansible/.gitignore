@@ -1,0 +1,5 @@
+inventory.ini
+fetched/
+*.retry
+*.pem
+.vault_pass

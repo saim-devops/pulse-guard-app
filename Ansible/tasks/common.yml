@@ -1,0 +1,118 @@
+- name: Disable swap (kubelet refuses to start with swap on)
+  ansible.builtin.command: swapoff -a
+  changed_when: true
+
+- name: Remove swap entry from fstab so it stays off after reboot
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^([^#].*\sswap\s.*)$'
+    replace: '# \1'
+
+- name: Load kernel modules required by the container runtime and CNI
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - overlay
+    - br_netfilter
+
+- name: Persist kernel modules across reboots
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      overlay
+      br_netfilter
+    mode: "0644"
+
+- name: Set sysctl params kubeadm requires (bridged traffic through iptables, IP forwarding)
+  ansible.posix.sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    sysctl_set: true
+    state: present
+    reload: true
+  loop:
+    - { name: "net.bridge.bridge-nf-call-iptables", value: "1" }
+    - { name: "net.bridge.bridge-nf-call-ip6tables", value: "1" }
+    - { name: "net.ipv4.ip_forward", value: "1" }
+
+- name: Install prerequisite packages
+  ansible.builtin.apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - software-properties-common
+    state: present
+    update_cache: true
+
+- name: Add Docker's GPG key (containerd.io ships from Docker's repo)
+  ansible.builtin.apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: Add the containerd apt repository
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+
+- name: Install containerd (latest available — pinning an exact build here risks the same "version not found" issue hit earlier with RDS)
+  ansible.builtin.apt:
+    name: containerd.io
+    state: present
+    update_cache: true
+
+- name: Generate default containerd config
+  ansible.builtin.command: containerd config default
+  register: containerd_default_config
+  changed_when: false
+
+- name: Write containerd config with SystemdCgroup enabled (required for kubelet)
+  ansible.builtin.copy:
+    dest: /etc/containerd/config.toml
+    content: "{{ containerd_default_config.stdout | regex_replace('SystemdCgroup = false', 'SystemdCgroup = true') }}"
+    mode: "0644"
+  notify: Restart containerd
+
+- name: Ensure containerd is enabled and running
+  ansible.builtin.systemd:
+    name: containerd
+    enabled: true
+    state: started
+
+- name: Add the Kubernetes apt signing key
+  ansible.builtin.get_url:
+    url: "https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version }}/deb/Release.key"
+    dest: /etc/apt/keyrings/kubernetes-apt-keyring.asc
+    mode: "0644"
+    force: true
+
+- name: Add the Kubernetes apt repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc] https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version }}/deb/ /"
+    state: present
+    filename: kubernetes
+
+- name: Install kubelet, kubeadm, kubectl at the pinned version
+  ansible.builtin.apt:
+    name:
+      - "kubelet={{ kubernetes_apt_version }}"
+      - "kubeadm={{ kubernetes_apt_version }}"
+      - "kubectl={{ kubernetes_apt_version }}"
+    state: present
+    update_cache: true
+
+- name: Hold Kubernetes packages at this version (no surprise upgrades from apt)
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - kubelet
+    - kubeadm
+    - kubectl
+
+- name: Enable kubelet
+  ansible.builtin.systemd:
+    name: kubelet
+    enabled: true

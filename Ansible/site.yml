@@ -1,0 +1,41 @@
+---
+- name: Prepare every node (containerd, kubeadm/kubelet/kubectl, kernel + sysctl prereqs)
+  hosts: k8s_cluster
+  become: true
+  gather_facts: true
+  handlers:
+    - name: import handlers
+      ansible.builtin.import_tasks: tasks/handlers.yml
+  tasks:
+    - name: Run common node prep
+      ansible.builtin.import_tasks: tasks/common.yml
+
+- name: Initialize the control plane
+  hosts: master
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Run master bootstrap
+      ansible.builtin.import_tasks: tasks/master.yml
+
+- name: Join worker nodes to the cluster
+  hosts: workers
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Run worker join
+      ansible.builtin.import_tasks: tasks/workers.yml
+
+- name: Verify the cluster
+  hosts: master
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Show node status
+      ansible.builtin.command: kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes -o wide
+      register: node_status
+      changed_when: false
+
+    - name: Print node status
+      ansible.builtin.debug:
+        msg: "{{ node_status.stdout_lines }}"
